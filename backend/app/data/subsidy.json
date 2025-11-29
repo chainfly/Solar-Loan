@@ -1,0 +1,40 @@
+{
+  "central": {
+    "residential": {
+      "upto_3kw": {
+        "percentage": 40,
+        "max_amount": 30000
+      },
+      "above_3kw": {
+        "percentage": 40,
+        "max_amount": 40000
+      }
+    },
+    "commercial": {
+      "percentage": 0
+    }
+  },
+  "state": {
+    "Maharashtra": {
+      "percentage": 20,
+      "max_amount": 20000
+    },
+    "Gujarat": {
+      "percentage": 25,
+      "max_amount": 25000
+    },
+    "Rajasthan": {
+      "percentage": 15,
+      "max_amount": 15000
+    },
+    "Karnataka": {
+      "percentage": 18,
+      "max_amount": 18000
+    },
+    "Tamil Nadu": {
+      "percentage": 20,
+      "max_amount": 20000
+    }
+  }
+}
+

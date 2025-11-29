@@ -1,0 +1,108 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: solar_loan_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/solar_loan_ai
+      REDIS_URL: redis://redis:6379/0
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      S3_BUCKET_NAME: solar-loan-documents
+      S3_ENDPOINT_URL: http://minio:9000
+      USE_MINIO: "true"
+      USE_MOCKS: "false"
+      SECRET_KEY_JWT: ${SECRET_KEY_JWT:-change-me-in-production}
+      FERNET_KEY: ${FERNET_KEY:-change-me-in-production-32-bytes-long}
+      # Decentro
+      DECENTRO_API_BASE: https://in.staging.decentro.tech
+      DECENTRO_CLIENT_ID: chainfly_staging
+      DECENTRO_CLIENT_SECRET: ${DECENTRO_CLIENT_SECRET:-MR3lyetIcCg8CPNNqsXCF8TDrO0419Bc}
+      DECENTRO_KYC_MODULE_SECRET: ${DECENTRO_KYC_MODULE_SECRET:-106I4zQ2xgm2UvA9OOowQLTWciq8Exos}
+      DECENTRO_CORE_BANKING_MODULE_SECRET: ${DECENTRO_CORE_BANKING_MODULE_SECRET:-KkT2muRGLBMgHskJ4GSn4noMiD3TKZoO}
+      DECENTRO_BYTES_MODULE_SECRET: ${DECENTRO_BYTES_MODULE_SECRET:-SaLmfp0k3lt2ZlKi1Sc0lmk5mupcK}
+      DECENTRO_IDFC_BANK_PROVIDER_SECRET: ${DECENTRO_IDFC_BANK_PROVIDER_SECRET:-yQVk6hcVfZS4SBo8OJXE0q6LUQFbCEmT}
+      DECENTRO_PAYMENTS_MODULE_SECRET: ${DECENTRO_PAYMENTS_MODULE_SECRET:-Np8v22u83oIObyDu4mqfZpuJlOpkwvJV}
+      DECENTRO_FINANCIAL_SERVICES_MODULE_SECRET: ${DECENTRO_FINANCIAL_SERVICES_MODULE_SECRET:-5YgfJC3nzibzinqQpwrSVa46CFA1r2ne}
+      DECENTRO_EQUIFAX_PROVIDER_SECRET: ${DECENTRO_EQUIFAX_PROVIDER_SECRET:-NjXoyvuzGF4rW6NEWktLqMJNcHNpiUB1}
+      DECENTRO_API_KEY: ${DECENTRO_API_KEY:-106I4zQ2xgm2UvA9OOowQLTWciq8Exos}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - ./logs:/app/logs
+      - ./app/data:/app/app/data
+      - ./app/ml_models:/app/app/ml_models
+
+  celery-worker:
+    build: .
+    command: celery -A app.celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/solar_loan_ai
+      REDIS_URL: redis://redis:6379/0
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      S3_BUCKET_NAME: solar-loan-documents
+      S3_ENDPOINT_URL: http://minio:9000
+      USE_MINIO: "true"
+      USE_MOCKS: "false"
+    depends_on:
+      - postgres
+      - redis
+      - minio
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
